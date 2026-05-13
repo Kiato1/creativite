@@ -185,7 +185,7 @@ def main(page: ft.Page):
             ]
 
             for incluir_frais, nombre_archivo in archivos:
-                ruta = os.path.join("assets", nombre_archivo)
+                ruta = os.path.join("/tmp", nombre_archivo)
                 construir_pdf(incluir_frais).output(ruta)
 
             # -----------------------------
