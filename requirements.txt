@@ -1,3 +1,2 @@
-echo flet>=0.21.0> requirements.txt
-echo fpdf2>> requirements.txt
-echo pandas>> requirements.txt
+fpdf2
+pandas

@@ -235,7 +235,7 @@ def main(page: ft.Page):
                         prod_nombre,
                         prod_cant,
                         prod_precio,
-                        ft.IconButton(ft.Icons.ADD, on_click=agregar_item)
+                        ft.IconButton(ft.icons.add, on_click=agregar_item)
                     ]),
 
                     ft.Row(
