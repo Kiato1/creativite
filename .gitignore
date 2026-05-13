@@ -1,0 +1,4 @@
+assets/*.exe 
+assets/*.pdf 
+__pycache__/ 
+*.pyc 
