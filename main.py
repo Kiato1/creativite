@@ -202,7 +202,7 @@ def main(page: ft.Page):
             # DESCARGA / APERTURA
             # -----------------------------
             for _, nombre_archivo in archivos:
-                page.launch_url(f"/assets/{nombre_archivo}")
+               page.launch_url(f"/{nombre_archivo}")
 
         except Exception as ex:
 
