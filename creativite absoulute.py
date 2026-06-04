@@ -26,7 +26,7 @@ lista_subtotales = []
 frais_tva = []
 manut_depot = []
 march_div = []
-frais_transport = []  # CORRECCIÓN: Nuevo almacén asignado para el transporte
+frais_transport_sd = []  # Nombre interno asignado para la lista
 Total = []                   
 
 def solicitud_articulo():
@@ -75,7 +75,7 @@ def solicitud_articulo():
 def solicitud_frais():
     print("\n----- CARGOS ADICIONALES (FRAIS) -----")
     
-    tva, depot, div, transport = 0.0, 0.0, 0.0, 0.0
+    tva, depot, div, transport_sd = 0.0, 0.0, 0.0, 0.0
     
     while True:
         entrada = input("Monto de TVA (o escribe 'salir' para omitir cargos): ").lower()
@@ -83,19 +83,20 @@ def solicitud_frais():
             frais_tva.append(0.0)
             manut_depot.append(0.0)
             march_div.append(0.0)
-            frais_transport.append(0.0)
+            frais_transport_sd.append(0.0)
             return 
         
         try:
             tva = float(entrada)
             depot = float(input("Monto por Manutention et Dépotage: "))
             div = float(input("Monto por Marchandises Diverses: "))
-            transport = float(input("Monto por Frais Transport: "))  # CORRECCIÓN: Solicitud del nuevo cargo
+            # Nombre de la etiqueta exacto solicitado en consola
+            transport_sd = float(input("Monto por Frais Transport Saint-Domingue: ")) 
             
             frais_tva.append(tva)
             manut_depot.append(depot)
             march_div.append(div)
-            frais_transport.append(transport)
+            frais_transport_sd.append(transport_sd)
             break
         except ValueError:
             print(">> Error: Ingresa montos numéricos válidos.")
@@ -108,10 +109,10 @@ solicitud_articulo()
 solicitud_frais()
 
 # ---------------------------------------------------------
-# CORRECCIÓN: CÁLCULO Y RESUMEN FINAL CON LOS FRAIS SUMADOS
+# CÁLCULO Y RESUMEN FINAL CON LOS FRAIS SUMADOS
 # ---------------------------------------------------------
 subtotal_productos = sum(lista_subtotales)
-total_frais = sum(frais_tva) + sum(manut_depot) + sum(march_div) + sum(frais_transport)
+total_frais = sum(frais_tva) + sum(manut_depot) + sum(march_div) + sum(frais_transport_sd)
 total_general_con_frais = subtotal_productos + total_frais
 
 print("\n===== RESUMEN DE FACTURA =====")
