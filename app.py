@@ -311,15 +311,20 @@ async function generarFacturas() {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url;
-        a.download = `Facturas_${payload.empresa}.zip`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-    } catch (e) {
-        errorDiv.style.display = 'flex';
-        errorDiv.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Error: ${e.message}`;
-    } finally {
+       <div class="card">
+    <div class="card-title">Cargos Adicionales (Frais)</div>
+    <div class="row">
+        <div class="field"><label>TVA</label><input id="tva" type="number" step="0.01" value="0"></div>
+        <div class="field"><label>Manutention et Dépotage</label><input id="manutencion" type="number" step="0.01" value="0"></div>
+        <div class="field"><label>Marchandises Diverses</label><input id="diversos" type="number" step="0.01" value="0"></div>
+    </div>
+    <div class="row" id="contenedor-transporte" style="margin-top: 15px; display: none;">
+        <div class="field" style="width: 100%;">
+            <label>Frais Transport Saint-Domingue</label>
+            <input id="transporte" type="number" step="0.01" value="0">
+        </div>
+    </div>
+</div> {
         loadingDiv.style.display = 'none';
     }
 }
