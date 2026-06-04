@@ -73,7 +73,6 @@ def construir_pdf(empresa, idioma, num_fac, fecha, cliente, df, tva, manutencion
     moneda = "EUR" if empresa == "CREATIVITE" else "RD$"
     subtotal = df["Subtotal"].sum()
     
-    # Se suman estrictamente todos los frais, incluyendo el nuevo de transporte
     total_frais = tva + manutencion + diversos + transporte
     total_general = subtotal + (total_frais if incluir_frais else 0)
 
@@ -99,9 +98,9 @@ def construir_pdf(empresa, idioma, num_fac, fecha, cliente, df, tva, manutencion
     pdf.cell(140, 8, "Marchandises Diverses:", 0, new_x=XPos.RIGHT, new_y=YPos.TOP, align="R")
     pdf.cell(40, 8, f"{diversos:,.2f}" if incluir_frais else "0.00", 1, new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="R")
 
-    # Mostrar Frais Transport solo si la empresa activa es CREATIVITE
+    # Muestra el cargo con el nombre exacto solicitado si la empresa activa es CREATIVITE
     if empresa == "CREATIVITE":
-        pdf.cell(140, 8, "Frais Transport:", 0, new_x=XPos.RIGHT, new_y=YPos.TOP, align="R")
+        pdf.cell(140, 8, "Frais Transport Saint-Domingue:", 0, new_x=XPos.RIGHT, new_y=YPos.TOP, align="R")
         pdf.cell(40, 8, f"{transporte:,.2f}" if incluir_frais else "0.00", 1, new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="R")
 
     pdf.set_font("helvetica", "B", 13)
@@ -154,7 +153,10 @@ HTML = """
         .card-title { font-size: 1.1rem; color: var(--primary); font-weight: 600; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.5rem; border-bottom: 2px solid var(--primary-light); padding-bottom: 0.5rem; }
 
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-        @media (max-width: 480px) { .grid-2 { grid-template-columns: 1fr; } }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+        @media (max-width: 480px) { 
+            .grid-2, .grid-3 { grid-template-columns: 1fr; } 
+        }
 
         .field { margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.35rem; }
         label { font-size: 0.85rem; font-weight: 600; color: var(--text); }
@@ -174,4 +176,199 @@ HTML = """
 
         #lista-productos { margin-top: 0.5rem; max-height: 250px; overflow-y: auto; }
         
-        .alert { padding: 1rem; border-radius: 8px; margin-top:
+        .alert { padding: 1rem; border-radius: 8px; margin-top: 1rem; display: none; font-size: 0.95rem; align-items: center; gap: 0.5rem; }
+        .alert-error { background-color: #ffebee; color: var(--danger); border: 1px solid #ffcdd2; }
+        .alert-loading { background-color: var(--primary-light); color: var(--primary); border: 1px solid #c5cae9; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1><i class="fa-solid fa-file-invoice-dollar"></i> Facturación Inteligente</h1>
+        <p>IELC (Dominicana) & CREATIVITE ABSOLUE (Guadalupe)</p>
+    </div>
+
+    <div class="card">
+        <div class="field">
+            <label><i class="fa-solid fa-building"></i> Entidad Emisora</label>
+            <select id="empresa" onchange="alternarCamposEmpresa()">
+                <option value="IELC">De León Import / IELC (RD$ - ES)</option>
+                <option value="CREATIVITE">Creativite Absolue (EUR - FR)</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title"><i class="fa-solid fa-user"></i> Datos del Cliente</div>
+        <div class="grid-2">
+            <div class="field"><label>Nombre</label><input id="nombre" type="text" placeholder="Ej. Juan"></div>
+            <div class="field"><label>Apellido</label><input id="apellido" type="text" placeholder="Ej. Pérez"></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title"><i class="fa-solid fa-hand-holding-dollar"></i> Cargos Adicionales (Frais)</div>
+        <div class="grid-3">
+            <div class="field"><label>TVA</label><input id="tva" type="number" step="0.01" value="0"></div>
+            <div class="field"><label>Manutention</label><input id="manutencion" type="number" step="0.01" value="0"></div>
+            <div class="field"><label>Diversos</label><input id="diversos" type="number" step="0.01" value="0"></div>
+        </div>
+        <div class="field" id="contenedor-transporte" style="margin-top: 1rem;">
+            <label>Frais Transport Saint-Domingue</label>
+            <input id="transporte" type="number" step="0.01" value="0">
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title"><i class="fa-solid fa-box"></i> Productos / Servicios</div>
+        <div id="lista-productos"></div>
+        <button class="btn btn-secondary" style="margin-top: 1rem;" onclick="agregarFilaProducto()">
+            <i class="fa-solid fa-plus"></i> Añadir Producto
+        </button>
+    </div>
+
+    <button class="btn btn-primary" onclick="generarFacturas()">
+        <i class="fa-solid fa-download"></i> Generar y Descargar Facturas (.ZIP)
+    </button>
+
+    <div id="alert-error" class="alert alert-error"></div>
+    <div id="alert-loading" class="alert alert-loading">
+        <i class="fa-solid fa-circle-notch fa-spin"></i> Procesando y empaquetando PDFs, por favor espere...
+    </div>
+</div>
+
+<script>
+function alternarCamposEmpresa() {
+    const empresa = document.getElementById('empresa').value;
+    const contenedorTransporte = document.getElementById('contenedor-transporte');
+    if (empresa === 'CREATIVITE') {
+        contenedorTransporte.style.display = 'flex';
+    } else {
+        contenedorTransporte.style.display = 'none';
+        document.getElementById('transporte').value = 0;
+    }
+}
+
+function agregarFilaProducto() {
+    const contenedor = document.getElementById('lista-productos');
+    const div = document.createElement('div');
+    div.className = 'product-row';
+    div.innerHTML = `
+        <div class="field" style="margin:0"><label style="font-size:0.75rem">Descripción</label><input type="text" class="p-nombre" placeholder="Producto"></div>
+        <div class="field" style="margin:0"><label style="font-size:0.75rem">Cant.</label><input type="number" class="p-cant" value="1" min="1"></div>
+        <div class="field" style="margin:0"><label style="font-size:0.75rem">Precio</label><input type="number" class="p-precio" value="0" step="0.01"></div>
+        <button class="btn btn-danger" onclick="this.parentElement.remove()"><i class="fa-solid fa-trash"></i></button>
+    `;
+    contenedor.appendChild(div);
+}
+
+agregarFilaProducto();
+alternarCamposEmpresa();
+
+async function generarFacturas() {
+    const errorDiv = document.getElementById('alert-error');
+    const loadingDiv = document.getElementById('alert-loading');
+    errorDiv.style.display = 'none';
+    loadingDiv.style.display = 'flex';
+
+    try {
+        const productos = [];
+        const filas = document.querySelectorAll('.product-row');
+        
+        filas.forEach(f => {
+            const nombre = f.querySelector('.p-nombre').value.trim();
+            const cant = parseInt(f.querySelector('.p-cant').value) || 0;
+            const precio = parseFloat(f.querySelector('.p-precio').value) || 0;
+            if(nombre) {
+                productos.push({ nombre, cant, precio, subtotal: cant * precio });
+            }
+        });
+
+        if(productos.length === 0) {
+            throw new Error("Debe agregar al menos un producto válido.");
+        }
+
+        const payload = {
+            empresa: document.getElementById('empresa').value,
+            nombre: document.getElementById('nombre').value.trim() || "Cliente",
+            apellido: document.getElementById('apellido').value.trim() || "General",
+            tva: parseFloat(document.getElementById('tva').value) || 0,
+            manutencion: parseFloat(document.getElementById('manutencion').value) || 0,
+            diversos: parseFloat(document.getElementById('diversos').value) || 0,
+            transporte: parseFloat(document.getElementById('transporte').value) || 0,
+            productos: productos
+        };
+
+        const response = await fetch('/generar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) throw new Error("Error en el servidor al generar el ZIP.");
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Facturas_${payload.empresa}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+    } catch (e) {
+        errorDiv.style.display = 'flex';
+        errorDiv.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Error: ${e.message}`;
+    } finally {
+        loadingDiv.style.display = 'none';
+    }
+}
+</script>
+</body>
+</html>
+"""
+
+@app.route("/")
+def index():
+    return render_template_string(HTML)
+
+
+@app.route("/generar", methods=["POST"])
+def generar():
+    data = request.get_json()
+
+    empresa = data["empresa"]
+    idioma = "FR" if empresa == "CREATIVITE" else "ES"
+    nombre = f"{data['nombre']} {data['apellido']}"
+    num_fac = f"FAC-{random.randint(10000, 99999)}"
+    fecha = datetime.datetime.now().strftime("%d/%m/%Y")
+    tva = float(data.get("tva", 0))
+    manutencion = float(data.get("manutencion", 0))
+    diversos = float(data.get("diversos", 0))
+    transporte = float(data.get("transporte", 0)) if empresa == "CREATIVITE" else 0.0
+
+    df = pd.DataFrame([{
+        "Producto": p["nombre"],
+        "Cantidad": p["cant"],
+        "Precio": p["precio"],
+        "Subtotal": p["subtotal"]
+    } for p in data["productos"]])
+
+    pdf_con = construir_pdf(empresa, idioma, num_fac, fecha, nombre, df, tva, manutencion, diversos, transporte, True)
+    pdf_sin = construir_pdf(empresa, idioma, num_fac, fecha, nombre, df, tva, manutencion, diversos, transporte, False)
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w") as zf:
+        zf.writestr(f"Factura_{num_fac}_con_frais.pdf", pdf_con)
+        zf.writestr(f"Factura_{num_fac}_sin_frais.pdf", pdf_sin)
+    zip_buffer.seek(0)
+
+    return send_file(
+        zip_buffer,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name="facturas.zip"
+    )
+
+if __name__ == "__main__":
+    app.run(debug=True)
