@@ -1,89 +1,79 @@
-from fpdf import FPDF, XPos, YPos
+# =====================================================================
+# MÓDULO: LEÓN IMPORT (Actualización: Sin Diversos + Factura Única)
+# =====================================================================
 
-def generar_documento_final(nombre_archivo, empresa, idioma, incluir_frais, tva=0, manutencion=0, diversos=0, transporte=0):
-    # Diccionario de idiomas para etiquetas dinámicas
-    lang = {
-        "ES": {
-            "fac": "FACTURA:", "fec": "FECHA:", "cli": "CLIENTE:",
-            "tva": "TVA:", "man": "Manutention et Dépotage:", "div": "Marchandises Diverses:",
-            "tra": "Frais Transport Saint-Domingue:", "tot": "TOTAL GENERAL:",
-            "firm_c": "Firma Cliente", "firm_a": "Firma Autorizada"
-        },
-        "FR": {
-            "fac": "FACTURE:", "fec": "DATE:", "cli": "CLIENT:",
-            "tva": "TVA:", "man": "Manutention et Dépotage:", "div": "Marchandises Diverses:",
-            "tra": "Frais Transport Saint-Domingue:", "tot": "TOTAL GENERAL:",
-            "firm_c": "Signature Client", "firm_a": "Signature Autorisée"
-        }
+def calcular_totales_leon_import(subtotal_productos, tva_porcentaje, manutencion_fijo):
+    """
+    Calcula el total general para León Import.
+    SE ELIMINÓ EL CARGO DE GASTOS DIVERSOS DEL SISTEMA.
+    """
+    monto_tva = subtotal_productos * (tva_porcentaje / 100.0)
+    
+    # El total ahora solo suma Subtotal + IVA + Manutención
+    total_general = subtotal_productos + monto_tva + manutencion_fijo
+    
+    resultados = {
+        "Fecha": obtener_fecha_actual(), 
+        "Subtotal_Productos": round(subtotal_productos, 2),
+        "IVA_Calculado": round(monto_tva, 2),
+        "Gastos_Manutencion": round(manutencion_fijo, 2),
+        "TOTAL_GENERAL": round(total_general, 2)
     }
     
-    l = lang[idioma]
-    moneda = "EUR" if empresa == "CREATIVITE" else "RD$"
+    return resultados
+
+def mapear_columnas_leon_espanol(dataframe_modulo):
+    """
+    Mapeo de columnas optimizado. Se eliminó la columna de Diversos.
+    """
+    columnas_espanol = {
+        'Fecha': 'Fecha',
+        'Factura': 'Factura',
+        'Cliente': 'Cliente',
+        'Telefono5': 'Teléfono',
+        'Subtotal_Prod': 'Subtotal Productos',
+        'TVA': 'IVA / Impuesto',
+        'Manutencion': 'Gastos de Manutención',
+        'TOTAL_GENERAL': 'TOTAL GENERAL'
+    }
+    # Filtramos para asegurarnos de que si 'Diversos' existe en el DataFrame original, se descarte
+    columnas_existentes = [col for col in dataframe_modulo.columns if col != 'Diversos']
+    df_filtrado = dataframe_modulo[columnas_existentes]
     
-    # Cálculos matemáticos correctos
-    subtotal_productos = sum(lista_subtotales)
-    total_frais = tva + manutencion + diversos + transporte
-    total_final = subtotal_productos + (total_frais if incluir_frais else 0)
+    return df_filtrado.rename(columns=columnas_espanol)
+
+def imprimir_factura_unica_leon(dataframe_ventas, id_factura=None):
+    """
+    Controla la impresión para que estrictamente se emita UNA SOLA factura.
+    Si no se pasa un id_factura, por defecto toma la última del registro.
+    """
+    if dataframe_ventas.empty:
+        print("No hay datos disponibles para imprimir.")
+        return
     
-    # Inicializar PDF usando la clase FacturaIELC que ya tienes definida
-    pdf = FacturaIELC(empresa=empresa, idioma=idioma)
-    pdf.add_page()
+    # Aplicar el filtro de columnas en español (sin diversos)
+    df_espanol = mapear_columnas_leon_espanol(dataframe_ventas)
     
-    # Datos de encabezado de Factura
-    pdf.set_font("helvetica", "B", 12)
-    pdf.cell(0, 8, f"{l['fac']} {factura_final}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.cell(0, 8, f"{l['fec']} {fecha_limpia}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.cell(0, 8, f"{l['cli']} {nombre_apellido1} {nombre_apellido2}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.ln(5)
+    # Selección de la factura única
+    if id_factura:
+        factura_a_imprimir = df_espanol[df_espanol['Factura'] == id_factura]
+        if factura_a_imprimir.empty:
+            print(f"No se encontró la factura {id_factura}. Tomando la última registrada.")
+            factura_a_imprimir = df_espanol.iloc[[-1]]
+    else:
+        # Por defecto, toma estrictamente la última fila (la factura más reciente)
+        factura_a_imprimir = df_espanol.iloc[[-1]]
     
-    # Reutiliza tu función interna para dibujar la tabla de ítems cargados en las listas
-    # Creando un DataFrame temporal con los productos actuales en memoria
-    import pandas as pd
-    df_temporal = pd.DataFrame({
-        "Producto": almacen_producto,
-        "Cantidad": almacen_cantidad,
-        "Precio": precio_unit,
-        "Subtotal": lista_subtotales
-    })
-    pdf.tabla_productos(df_temporal)
-    pdf.ln(5)
+    # --- LOGICA DE IMPRESIÓN (Aquí conectas con tu generador de PDF / Consola) ---
+    print(f"=== IMPRIMIENDO FACTURA ÚNICA [LEÓN IMPORT] ===")
+    for index, fila in factura_a_imprimir.iterrows():
+        print(f"Factura: {fila['Factura']} | Cliente: {fila['Cliente']}")
+        print(f"Subtotal: {fila['Subtotal Productos']} | Manutención: {fila['Gastos de Manutención']}")
+        print(f"Total General: {fila['TOTAL GENERAL']}")
+    print(f"===============================================")
     
-    # --- SECCIÓN DE CARGOS ADICIONALES (FRAIS) ---
-    pdf.set_font("helvetica", "", 11)
-    
-    # 1. TVA
-    pdf.cell(140, 8, l['tva'], 0, new_x=XPos.RIGHT, new_y=YPos.TOP, align="R")
-    pdf.cell(40, 8, f"{tva:,.2f}" if incluir_frais else "0.00", 1, new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="R")
-    
-    # 2. Manutention
-    pdf.cell(140, 8, l['man'], 0, new_x=XPos.RIGHT, new_y=YPos.TOP, align="R")
-    pdf.cell(40, 8, f"{manutencion:,.2f}" if incluir_frais else "0.00", 1, new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="R")
-    
-    # 3. Diversos
-    pdf.cell(140, 8, l['div'], 0, new_x=XPos.RIGHT, new_y=YPos.TOP, align="R")
-    pdf.cell(40, 8, f"{diversos:,.2f}" if incluir_frais else "0.00", 1, new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="R")
-    
-    # 4. Cargo Exclusivo de Transporte para CREATIVITE
-    if empresa == "CREATIVITE":
-        pdf.cell(140, 8, l['tra'], 0, new_x=XPos.RIGHT, new_y=YPos.TOP, align="R")
-        pdf.cell(40, 8, f"{transporte:,.2f}" if incluir_frais else "0.00", 1, new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="R")
-        
-    # --- TOTAL GENERAL ---
-    pdf.set_font("helvetica", "B", 13)
-    pdf.cell(140, 10, l['tot'], 0, new_x=XPos.RIGHT, new_y=YPos.TOP, align="R")
-    pdf.cell(40, 10, f"{moneda} {total_final:,.2f}", 1, new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="R")
-    
-    # --- SECCIÓN DE FIRMAS ---
-    pdf.ln(20)
-    y = pdf.get_y()
-    pdf.line(20, y, 70, y)
-    pdf.set_xy(20, y + 2)
-    pdf.cell(50, 5, l['firm_c'], 0, new_x=XPos.RIGHT, new_y=YPos.TOP, align="C")
-    
-    pdf.line(130, y, 180, y)
-    pdf.set_xy(130, y + 2)
-    pdf.cell(50, 5, l['firm_a'], 0, new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-    
-    # Guardar archivo generado
-    pdf.output(nombre_archivo)
-    print(f">> Archivo guardado con éxito: {nombre_archivo}")
+    return factura_a_imprimir
+
+# =====================================================================
+# FIN DEL MÓDULO: LEÓN IMPORT
+# =====================================================================
